@@ -7,4 +7,5 @@ SpeechRecognition>=3.10
 sounddevice>=0.4.7
 numpy>=1.26
 opencv-python>=4.9
+tk
 wikipedia>=1.4.0
