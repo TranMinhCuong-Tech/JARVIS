@@ -50,3 +50,18 @@ class UserMemory:
         if isinstance(history, list):
             return [str(item) for item in history]
         return []
+
+    def add_note(self, note: str) -> None:
+        notes = self.data.setdefault("notes", [])
+        notes.append(note)
+        self.save()
+
+    def list_notes(self) -> list[str]:
+        notes = self.data.get("notes", [])
+        if isinstance(notes, list):
+            return [str(item) for item in notes]
+        return []
+
+    def clear_notes(self) -> None:
+        self.data["notes"] = []
+        self.save()

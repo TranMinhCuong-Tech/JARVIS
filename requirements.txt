@@ -1,3 +1,4 @@
+# Core (all platforms: Windows, macOS, Linux)
 psutil>=5.9
 pyautogui>=0.9.54
 pyperclip>=1.8
@@ -7,5 +8,38 @@ SpeechRecognition>=3.10
 sounddevice>=0.4.7
 numpy>=1.26
 opencv-python>=4.9
-tk
 wikipedia>=1.4.0
+Pillow>=10.0
+
+# New feature: text translation (weather/IP/search use stdlib urllib, no extra package)
+deep-translator>=1.11
+
+# macOS-only: required by pyttsx3's NSSpeechSynthesizer backend.
+pyobjc>=10.0; sys_platform == "darwin"
+
+# Windows-only: improves window/process control (taskkill fallback, COM access).
+pywin32>=306; sys_platform == "win32"
+
+# Tkinter ships with the standard Python installer on Windows/macOS.
+# On Linux it must be installed via the system package manager, e.g.:
+#   sudo apt-get install -y python3-tk
+
+# ---------------------------------------------------------------------------
+# OPTIONAL: PyAudio (NOT required — read before installing)
+# ---------------------------------------------------------------------------
+# JARVIS listens to the microphone via SpeechRecognition, which prefers
+# PyAudio but automatically falls back to `sounddevice` (already installed
+# above) when PyAudio is missing. Voice input works fine without PyAudio.
+#
+# Only install PyAudio if you specifically want it, and only if a prebuilt
+# wheel exists for your Python version:
+#   pip install PyAudio
+#
+# If that fails with "portaudio.h: No such file or directory" or a wheel
+# build error (common on brand-new Python versions like 3.14, where PyPI
+# has no prebuilt PyAudio wheel yet), just skip it:
+#   - Windows: use Python 3.11–3.13 if you want PyAudio, or skip it and
+#     rely on the automatic sounddevice fallback (recommended).
+#   - macOS:  brew install portaudio   then   pip install PyAudio
+#   - Linux:  sudo apt-get install -y portaudio19-dev python3-dev
+#             then   pip install PyAudio

@@ -16,7 +16,31 @@ def status_text() -> str:
     cpu = psutil.cpu_percent(interval=0.2)
     ram = psutil.virtual_memory().percent
     disk = psutil.disk_usage("/").percent
-    return f"Sir, CPU is at {cpu:.0f} percent, memory is at {ram:.0f} percent, and disk usage is {disk:.0f} percent."
+    battery_note = _battery_fragment()
+    return (
+        f"Sir, CPU is at {cpu:.0f} percent, memory is at {ram:.0f} percent, "
+        f"disk usage is {disk:.0f} percent{battery_note}."
+    )
+
+
+def battery_text() -> str:
+    """Standalone battery report for laptops; desktops will get a graceful message."""
+    if not psutil or not hasattr(psutil, "sensors_battery"):
+        return "I could not read battery information on this system, sir."
+    battery = psutil.sensors_battery()
+    if battery is None:
+        return "This machine does not report battery information, sir. It may be a desktop."
+    state = "charging" if battery.power_plugged else "on battery power"
+    return f"Battery is at {battery.percent:.0f} percent and the system is currently {state}, sir."
+
+
+def _battery_fragment() -> str:
+    if not psutil or not hasattr(psutil, "sensors_battery"):
+        return ""
+    battery = psutil.sensors_battery()
+    if battery is None:
+        return ""
+    return f", and battery is at {battery.percent:.0f} percent"
 
 
 def current_time_text() -> str:
