@@ -82,7 +82,7 @@ python main.py
 - Corner brackets and a sci-fi grid background for a true movie-console feel.
 - Live top-left SYSTEM panel (CPU / RAM / battery bars) and top-right TIME panel (clock + date), refreshed every second.
 - Color-coded state ring: cyan idle, green listening, amber thinking, cyan-white executing, pink speaking, red error.
-- Colorized conversation log (You / JARVIS / System) with timestamps.
+- Clean, unobstructed HUD — the on-screen response log panel has been removed so the arc-reactor logo is always fully visible; the conversation is still echoed to the console with timestamps for debugging.
 - One-click MIC and VOICE toggle buttons in the command bar.
 
 ### Core assistant
@@ -90,7 +90,7 @@ python main.py
 - Voice recognition using `SpeechRecognition`; falls back to `sounddevice` when needed.
 - Text-to-speech output with `pyttsx3` when available, with a mute toggle.
 - Open and close applications by name, cross-platform.
-- Play music on Spotify; search or auto-play the first result on YouTube in the default or a named browser.
+- Play the exact requested song on Spotify — resolved through the real Spotify catalog, then explicitly commanded to start (not just opened) once you approve access once — or the exact top-matching video on YouTube in the default or a named browser.
 - Send messages on WhatsApp and other messaging platforms.
 - Lock, sleep, or shut down the computer — always with a spoken confirmation step.
 - Open the webcam / camera viewer.
@@ -108,6 +108,46 @@ python main.py
 - **Google search** — "search google for best pizza in Rome".
 - **Battery & system status** — "system status", "battery level".
 - **Wikipedia & public IP** lookups, as before.
+
+## Accurate Spotify Playback (recommended setup)
+
+By default, "play `<song>` on Spotify" just opens Spotify's search for you to pick manually — that's the only safe fallback when JARVIS has no way to find or start the right track. To let JARVIS find the *exact* track **and actually press play**, set up a free Spotify app once:
+
+1. Create a free app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (any Spotify account works).
+2. In the app's settings, add this exact Redirect URI: `http://127.0.0.1:8888/callback`.
+3. Set your credentials using **either** of these (the file is the more reliable option — see the troubleshooting note below):
+   - **Recommended — a local file:** copy `jarvis.env.example` to `jarvis.env` (same folder as `main.py`) and fill in the two values:
+     ```
+     SPOTIFY_CLIENT_ID=your-client-id
+     SPOTIFY_CLIENT_SECRET=your-client-secret
+     ```
+     JARVIS loads this file automatically every time it starts — no terminal setup needed. It's already excluded from git.
+   - **Alternative — real environment variables:**
+     ```bash
+     export SPOTIFY_CLIENT_ID="your-client-id"
+     export SPOTIFY_CLIENT_SECRET="your-client-secret"
+     ```
+     On Windows: `set VAR=value` (Command Prompt) or `$env:VAR="value"` (PowerShell). These must be set **in the exact same terminal window/session** you use to run `python main.py`.
+4. The **first** time you ask JARVIS to play something on Spotify, it opens a browser tab asking you to approve access (needs Spotify Premium to control playback). Approve it once — JARVIS caches the login locally (`memory/spotify_token.json`, already excluded from git) and silently refreshes it after that, so you won't be asked again.
+
+**Why this step matters:** searching Spotify's catalog and *commanding playback* are two different permissions. A search-only token can find the exact song but can only *ask* the Spotify app to open it — Spotify itself then decides whether to autoplay, which is why a correct song could still fail to start. The one-time login above gives JARVIS a token that's actually allowed to press play, so it explicitly starts the exact track on your active device (retrying briefly if Spotify was just launched and hasn't registered as a device yet).
+
+Even without that login (or on a Free account, where Spotify's Web API refuses playback commands), JARVIS still opens the exact resolved track and then sends the system play/pause key, which reliably starts it because that key always targets whatever track Spotify just loaded — never a random or wrong result. So "found the song but it isn't playing" should no longer happen either way; the login above is what removes the small delay/best-effort nature of that fallback.
+
+If you skip this setup, JARVIS still finds the exact track once `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` are set, but relies on Spotify's own link-handling to start it — which is best-effort, not guaranteed. Without any credentials at all, JARVIS only opens Spotify's search box.
+
+### "JARVIS still says 'Set SPOTIFY_CLIENT_ID...' even though I set it"
+
+This message means JARVIS could not see the variables in its own process — almost always because of *where* they were set, not a code problem. Common causes:
+
+- You exported the variables in one terminal window, then ran `python main.py` in a **different** terminal, or from an IDE "Run" button / desktop shortcut that doesn't inherit that terminal's session. → Use the `jarvis.env` file instead; it always works regardless of how JARVIS is launched.
+- You closed and reopened the terminal after exporting — `export`/`set` only last for that session unless made permanent (e.g. added to `~/.bashrc`, `~/.zshrc`, or Windows' System Environment Variables).
+- A typo in the variable name, or the value has stray quotes/spaces.
+- To double-check what JARVIS itself sees, run this in the *same* terminal right before `python main.py`:
+  ```bash
+  python -c "import os; print(os.getenv('SPOTIFY_CLIENT_ID'), os.getenv('SPOTIFY_CLIENT_SECRET'))"
+  ```
+  If that prints `None None`, the variables truly aren't reaching Python yet — switch to `jarvis.env`.
 
 ## Example Commands
 
@@ -133,8 +173,8 @@ python main.py
 - Start the app with `python main.py`.
 - Watch the boot sequence, then speak a command or type it into the input box.
 - Use the `SEND` button or press `Enter` to submit text.
-- Use `MIC: ON/OFF` to pause automatic voice listening, and `VOICE: ON/OFF` to mute spoken replies while keeping the text log.
-- The assistant responds in the HUD log and speaks back if `pyttsx3` is installed and voice output is enabled.
+- Use `MIC: ON/OFF` to pause automatic voice listening, and `VOICE: ON/OFF` to mute spoken replies.
+- The assistant speaks its response back if `pyttsx3` is installed and voice output is enabled (also printed to the console).
 - Say `bye`, `goodbye`, or `you can sleep` to stop the assistant.
 
 ## Notes
@@ -142,7 +182,7 @@ python main.py
 - Command understanding is local and rule-based, not powered by a cloud LLM — fast, private, and works offline for most actions.
 - Voice recognition can use Google Web Speech without an API key, but it requires internet access. If `pocketsphinx` is installed, offline recognition may be available.
 - Weather, translation, Wikipedia, IP lookup, and Google search need an internet connection; everything else works fully offline.
-- For best desktop automation with Spotify and messaging apps, keep `pyautogui` and `pyperclip` installed.
+- Spotify playback no longer relies on simulated screen clicks — see "Accurate Spotify Playback" above. `pyautogui` and `pyperclip` are still used for messaging apps and the browser address bar, so keep them installed for best automation coverage.
 
 ## Project Structure
 

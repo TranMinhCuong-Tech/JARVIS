@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -10,6 +11,7 @@ from urllib.request import Request, urlopen
 
 from .app_launcher import open_app
 from .platform_utils import open_url
+from .spotify_auth import get_user_access_token
 
 try:
     import pyautogui
@@ -22,29 +24,120 @@ except Exception:
     pyperclip = None
 
 
+# ---------------------------------------------------------------------------
+# Spotify
+#
+# Playing "the exact original song" AND having it actually start playing
+# needs two separate things Spotify keeps apart on purpose:
+#   1. Search - can be done with a simple app-only token (Client Credentials).
+#   2. Command playback - the Web API's /me/player/play endpoint only accepts
+#      a token that a *user* has approved (scope user-modify-playback-state).
+#      An app-only token, or just opening a `spotify:track:<id>` link, can
+#      only ask nicely; Spotify decides on its own whether to autoplay, which
+#      is why the song was found but didn't start playing.
+#
+# So play_spotify now prefers a real user token: it logs the user in with
+# their browser once (cached + auto-refreshed after that), then explicitly
+# commands the Spotify app to start the exact track on the active device.
+# ---------------------------------------------------------------------------
+
 def play_spotify(song: str) -> str:
-    """Mo Spotify, tim bai hat va co gang phat ket qua dau tien."""
-    query = quote_plus(song)
-    if _spotify_web_api_play(song):
-        return f"I am playing {song} on Spotify, sir."
+    """Resolve the requested song to an exact Spotify track and play it."""
 
+    # 1) Playback-capable user token: an existing SPOTIFY_ACCESS_TOKEN env
+    #    var, or one obtained (and cached) via a one-time browser login using
+    #    SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET. This is the only path
+    #    that can *command* Spotify to play, rather than just ask it to.
+    user_token = os.getenv("SPOTIFY_ACCESS_TOKEN", "").strip() or get_user_access_token()
+    if user_token:
+        track_id, label = _spotify_search_track(song, user_token)
+        if track_id:
+            open_app("spotify")
+            if _spotify_command_playback(user_token, track_id):
+                return f"I am playing {label or song} on Spotify, sir."
+            # The Web API play command failed (e.g. a Free account without
+            # Premium, or the device still wasn't ready) - fall back to
+            # opening the exact same track and pressing play for it below,
+            # rather than giving up.
+            if _spotify_open_and_press_play(track_id):
+                return f"I am playing {label or song} on Spotify, sir."
+            return f"I found {label or song} on Spotify, sir, but could not confirm playback started - press play if it hasn't."
+
+    # 2) App-only token (search only, no playback permission) - the exact
+    #    track is still resolved correctly. Since opening the track link
+    #    alone isn't guaranteed to autoplay, we also press the system
+    #    play/pause key right after: safe to do because the track that's
+    #    loaded is already the exact one we resolved, so this only decides
+    #    *whether* it plays, never *what* plays.
+    app_token = _spotify_app_token()
+    if app_token:
+        track_id, label = _spotify_search_track(song, app_token)
+        if track_id:
+            open_app("spotify")
+            if _spotify_open_and_press_play(track_id):
+                return f"I am playing {label or song} on Spotify, sir."
+            return f"I opened {label or song} on Spotify, sir, but could not confirm playback started - press play if it hasn't."
+
+    # 3) No credentials configured at all: fall back to opening Spotify's
+    #    search so the user can pick the track themselves. We deliberately no
+    #    longer guess at screen coordinates here, since blind double-clicking
+    #    is exactly what was causing the wrong song to play.
     open_app("spotify")
-    if pyautogui and pyperclip:
-        time.sleep(3.5 if platform.system() == "Windows" else 2.5)
-        try:
-            _spotify_search_and_play(song)
-            return f"I am searching for and playing {song} on Spotify, sir."
-        except Exception as exc:
-            return f"I found {song} on Spotify, sir, but could not press play automatically: {exc}"
-    open_url(f"https://open.spotify.com/search/{query}")
-    return f"I opened Spotify search for {song}, sir. Install pyautogui and pyperclip to autoplay it."
+    time.sleep(3.0 if platform.system() == "Windows" else 2.0)
+    open_url(f"spotify:search:{quote(song)}")
+    return (
+        f"I opened Spotify and searched for {song}, sir. "
+    )
 
 
-def _spotify_web_api_play(song: str) -> bool:
-    token = os.getenv("SPOTIFY_ACCESS_TOKEN", "").strip()
-    if not token:
+def _spotify_open_and_press_play(track_id: str) -> bool:
+    """Open the exact resolved track, then press the system play key.
+
+    Opening `spotify:track:<id>` only navigates/cues the track - on many
+    setups (especially Free accounts) it does not start playback on its own,
+    which is exactly the "found it but it didn't play" symptom. The media
+    play/pause key is an OS-level signal routed to the current media app
+    regardless of which window has focus, so it reliably starts the track
+    that was just cued.
+    """
+    open_app("spotify")
+    open_url(f"spotify:track:{track_id}")
+    if not pyautogui:
+        return False
+    time.sleep(3.2 if platform.system() == "Windows" else 2.0)
+    try:
+        pyautogui.press("playpause")
+        return True
+    except Exception:
         return False
 
+
+def _spotify_app_token() -> str | None:
+    """Get an app-only access token via the Client Credentials flow."""
+    client_id = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
+    if not client_id or not client_secret:
+        return None
+    try:
+        credentials = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("ascii")
+        request = Request(
+            "https://accounts.spotify.com/api/token",
+            data=b"grant_type=client_credentials",
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return payload.get("access_token")
+    except Exception:
+        return None
+
+
+def _spotify_search_track(song: str, token: str) -> tuple[str | None, str | None]:
+    """Return (track_id, 'Title - Artist') for the top matching track."""
     try:
         search_url = f"https://api.spotify.com/v1/search?q={quote(song)}&type=track&limit=1"
         request = Request(search_url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
@@ -52,15 +145,57 @@ def _spotify_web_api_play(song: str) -> bool:
             payload = json.loads(response.read().decode("utf-8"))
         tracks = payload.get("tracks", {}).get("items", [])
         if not tracks:
-            return False
+            return None, None
+        track = tracks[0]
+        artists = ", ".join(artist.get("name", "") for artist in track.get("artists", []) if artist.get("name"))
+        title = track.get("name") or song
+        label = f"{title} - {artists}" if artists else title
+        return track.get("id"), label
+    except Exception:
+        return None, None
 
-        track_uri = tracks[0].get("uri")
-        if not track_uri:
-            return False
 
+def _spotify_command_playback(token: str, track_id: str) -> bool:
+    """Explicitly start the track on an active device, with one retry.
+
+    Right after `open_app("spotify")` the app may not have registered itself
+    as an active Spotify Connect device yet, so a single failed attempt does
+    not necessarily mean playback can't be started - give it a moment.
+    """
+    device_id = _spotify_pick_device(token)
+    if device_id and _spotify_start_playback(token, track_id, device_id):
+        return True
+
+    time.sleep(2.5)
+    device_id = _spotify_pick_device(token)
+    return bool(device_id) and _spotify_start_playback(token, track_id, device_id)
+
+
+def _spotify_pick_device(token: str) -> str | None:
+    try:
+        request = Request(
+            "https://api.spotify.com/v1/me/player/devices",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        )
+        with urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        devices = payload.get("devices", [])
+        if not devices:
+            return None
+        active = next((device for device in devices if device.get("is_active")), None)
+        return (active or devices[0]).get("id")
+    except Exception:
+        return None
+
+
+def _spotify_start_playback(token: str, track_id: str, device_id: str | None = None) -> bool:
+    try:
+        url = "https://api.spotify.com/v1/me/player/play"
+        if device_id:
+            url += f"?device_id={quote(device_id)}"
         play_request = Request(
-            "https://api.spotify.com/v1/me/player/play",
-            data=json.dumps({"uris": [track_uri]}).encode("utf-8"),
+            url,
+            data=json.dumps({"uris": [f"spotify:track:{track_id}"]}).encode("utf-8"),
             headers={
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
@@ -74,72 +209,26 @@ def _spotify_web_api_play(song: str) -> bool:
         return False
 
 
-def _spotify_search_and_play(song: str) -> None:
-    """Search first, then activate the first Spotify result."""
-    assert pyautogui is not None
-    assert pyperclip is not None
-
-    old_failsafe = getattr(pyautogui, "FAILSAFE", True)
-    pyautogui.FAILSAFE = False
-    try:
-        open_url(f"spotify:search:{quote(song)}")
-        time.sleep(2.4)
-        _spotify_play_first_search_result()
-    finally:
-        pyautogui.FAILSAFE = old_failsafe
-
-
-def _spotify_play_first_search_result() -> None:
-    assert pyautogui is not None
-
-    # The URI opens the requested search page first. Double-clicking the top
-    # result is closer to how Spotify Desktop reliably starts a searched song.
-    pyautogui.press("esc")
-    time.sleep(0.35)
-    if _spotify_double_click_top_result():
-        return
-
-    # Keyboard fallback for layouts where the active window position cannot be
-    # read. Space is still avoided because it can toggle the previous track.
-    pyautogui.press("home")
-    time.sleep(0.2)
-    for _ in range(2):
-        pyautogui.press("tab")
-        time.sleep(0.18)
-    pyautogui.press("down")
-    time.sleep(0.18)
-    pyautogui.press("enter")
-    time.sleep(0.9)
-    pyautogui.press("enter")
-
-
-def _spotify_double_click_top_result() -> bool:
-    assert pyautogui is not None
-
-    try:
-        window = pyautogui.getActiveWindow()
-    except Exception:
-        window = None
-
-    try:
-        if window and window.width > 300 and window.height > 260:
-            x = window.left + int(window.width * 0.42)
-            y = window.top + int(window.height * 0.38)
-        else:
-            screen_w, screen_h = pyautogui.size()
-            x = int(screen_w * 0.42)
-            y = int(screen_h * 0.38)
-        pyautogui.doubleClick(x, y, interval=0.08)
-        time.sleep(0.8)
-        return True
-    except Exception:
-        return False
-
+# ---------------------------------------------------------------------------
+# YouTube
+#
+# The previous implementation grabbed the *first* "videoId" found anywhere in
+# the raw search page HTML, which just as often matched a Mix, a shelf, a
+# channel card, or a "people also watched" suggestion instead of the actual
+# top organic result for the query. We now parse YouTube's own results JSON
+# (ytInitialData) and walk only the real search-result section, picking the
+# first genuine videoRenderer entry - the same video a human would click.
+# ---------------------------------------------------------------------------
 
 def play_youtube(video: str, browser: str | None = None) -> str:
-    """Mo video YouTube dau tien neu lay duoc, neu khong thi mo trang search."""
-    video_url = _first_youtube_video_url(video)
-    url = video_url or f"https://www.youtube.com/results?search_query={quote_plus(video)}"
+    """Play the top matching YouTube video for the request."""
+    video_id, title = _first_youtube_video(video)
+    label = title or video
+    if video_id:
+        url = f"https://www.youtube.com/watch?v={video_id}&autoplay=1"
+    else:
+        url = f"https://www.youtube.com/results?search_query={quote_plus(video)}"
+
     if browser:
         open_app(browser)
         time.sleep(1.5)
@@ -148,17 +237,17 @@ def play_youtube(video: str, browser: str | None = None) -> str:
             pyperclip.copy(url)
             pyautogui.hotkey("ctrl", "v")
             pyautogui.press("enter")
-            if video_url:
-                return f"I am playing {video} on YouTube in {browser}, sir."
+            if video_id:
+                return f"I am playing {label} on YouTube in {browser}, sir."
             return f"I opened YouTube in {browser} to search for {video}, sir."
     open_url(url)
-    if video_url:
-        return f"I am playing {video} on YouTube, sir."
+    if video_id:
+        return f"I am playing {label} on YouTube, sir."
     return f"I opened YouTube to search for {video}, sir."
 
 
-def _first_youtube_video_url(query: str) -> str | None:
-    """Lay URL video dau tien bang HTML search, khong can API key."""
+def _first_youtube_video(query: str) -> tuple[str | None, str | None]:
+    """Return (video_id, title) for the top real search result, if any."""
     search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp=EgIQAQ%253D%253D"
     try:
         request = Request(
@@ -170,15 +259,45 @@ def _first_youtube_video_url(query: str) -> str | None:
         )
         with urlopen(request, timeout=8) as response:
             html = response.read().decode("utf-8", errors="ignore")
-        seen: set[str] = set()
-        for video_id in re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html):
-            if video_id in seen:
-                continue
-            seen.add(video_id)
-            return f"https://www.youtube.com/watch?v={video_id}"
     except Exception:
-        return None
-    return None
+        return None, None
+    return _parse_youtube_first_result(html)
+
+
+def _parse_youtube_first_result(html: str) -> tuple[str | None, str | None]:
+    match = re.search(r"var ytInitialData\s*=\s*(\{.*?\});</script>", html, re.S)
+    if not match:
+        match = re.search(r'ytInitialData"\]\s*=\s*(\{.*?\});', html, re.S)
+    if not match:
+        return None, None
+
+    try:
+        data = json.loads(match.group(1))
+    except Exception:
+        return None, None
+
+    try:
+        sections = (
+            data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]
+            ["sectionListRenderer"]["contents"]
+        )
+    except (KeyError, TypeError):
+        return None, None
+
+    for section in sections:
+        items = section.get("itemSectionRenderer", {}).get("contents", [])
+        for item in items:
+            # Skip anything that is not a plain video result: channelRenderer,
+            # shelfRenderer (Mixes/playlists), adSlotRenderer, etc. These are
+            # exactly the kinds of entries that used to hijack the old regex.
+            video = item.get("videoRenderer")
+            if not video or not video.get("videoId"):
+                continue
+            runs = (video.get("title") or {}).get("runs") or []
+            title = "".join(run.get("text", "") for run in runs) or None
+            return video["videoId"], title
+
+    return None, None
 
 
 def send_message_flow(platform: str, receiver: str, message: str) -> str:

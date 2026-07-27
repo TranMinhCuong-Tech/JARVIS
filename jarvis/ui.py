@@ -180,26 +180,6 @@ class JarvisUI:
             anchor="w",
         ).grid(row=1, column=0, columnspan=4, sticky="ew", pady=(7, 0))
 
-        self.log = tk.Text(
-            self.hud,
-            bg="#061018",
-            fg="#c3fbff",
-            insertbackground="#52ffff",
-            relief="flat",
-            wrap="word",
-            font=("Consolas", 9),
-            padx=12,
-            pady=8,
-            borderwidth=0,
-            state="normal",
-        )
-        self.log.tag_configure("you", foreground="#7dffb0", font=("Consolas", 9, "bold"))
-        self.log.tag_configure("jarvis", foreground="#ffd45c", font=("Consolas", 9, "bold"))
-        self.log.tag_configure("sys", foreground="#ff8f9d", font=("Consolas", 9, "bold"))
-        self.log.tag_configure("time", foreground=TEXT_DIM, font=("Consolas", 8))
-        self.log.tag_configure("body", foreground="#c3fbff")
-        self.log_window = self.hud.create_window(0, 0, window=self.log, anchor="nw")
-
         # Boot overlay
         self.boot_overlay = tk.Frame(self.root, bg=BG)
         self.boot_text = tk.StringVar(value="")
@@ -236,7 +216,6 @@ class JarvisUI:
         self._draw_circular_hud(cx, cy, r)
         self._draw_corner_brackets(width, height)
         self._draw_status_panels(width, height)
-        self._position_log(width, height)
 
         self.root.after(33, self._animate)
 
@@ -436,14 +415,6 @@ class JarvisUI:
                 tags="hud",
             )
 
-    def _position_log(self, width: int, height: int) -> None:
-        log_w = int(min(620, width * 0.66))
-        log_h = 110
-        x = int((width - log_w) / 2)
-        y = int(height - log_h - 18)
-        self.hud.coords(self.log_window, x, y)
-        self.hud.itemconfigure(self.log_window, width=log_w, height=log_h)
-
     # ------------------------------------------------------------------
     # Command / voice handling
     # ------------------------------------------------------------------
@@ -557,10 +528,10 @@ class JarvisUI:
             self.events.put(("state", "idle"))
 
     def _log(self, who: str, text: str, tag: str) -> None:
-        self.log.insert("end", f"{time.strftime('%H:%M:%S')}  ", "time")
-        self.log.insert("end", f"{who}: ", tag)
-        self.log.insert("end", f"{text}\n\n", "body")
-        self.log.see("end")
+        # The on-screen transcript panel was removed to keep the HUD clean and
+        # keep the logo fully visible. Conversation is still echoed to the
+        # console for debugging.
+        print(f"[{time.strftime('%H:%M:%S')}] {who}: {text}")
 
     def _set_state(self, state: str) -> None:
         self.ui_state = state
