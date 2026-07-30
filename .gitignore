@@ -1,3 +1,2 @@
 .env/
-jarvis/__pycache__/
-memory/
+__pycache__/
