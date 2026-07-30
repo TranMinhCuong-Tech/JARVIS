@@ -1,5 +1,7 @@
 # AI Voice Agent - J.A.R.V.I.S
 
+![JARVIS](assets/image.png)
+
 A modular AI Voice Agent built with Python and Tkinter, featuring a 3D particle sphere interface, speech recognition (ASR), natural language understanding (NLU), and text-to-speech (TTS).
 
 ## Architecture
