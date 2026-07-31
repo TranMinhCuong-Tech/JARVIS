@@ -1,2 +1,6 @@
 .env/
 __pycache__/
+agent/__pycache__/
+core/__pycache__/
+executor/__pycache__/
+nlu/__pycache__/

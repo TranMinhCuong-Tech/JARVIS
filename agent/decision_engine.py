@@ -6,32 +6,25 @@ from executor.actions import ActionExecutor
 class DecisionEngine:
     """Component Decision Engine / Planner - Lap ke hoach va quyet dinh hanh dong."""
 
+    # Nguong tin cay toi thieu de thuc thi truc tiep mot intent tu NLU.
+    # NLU rule-based chi tra ve 0.95 (khop mau) hoac 0.30 (UNKNOWN), nen
+    # nguong nay chu yeu dung de "bat" intent UNKNOWN va chuyen sang AI Brain.
+    CONFIDENCE_THRESHOLD = 0.5
+
     def __init__(
         self,
         context: ContextMemory,
         executor: ActionExecutor,
         tts: TextToSpeech,
+        llm=None,
     ):
         self.context = context
         self.executor = executor
         self.tts = tts
-
-    def process(self, text: str) -> bool:
-        """Ham nhan van ban tho, gia dinh NLU don gian hoac goi process_and_execute truc tiep."""
-        # Gia dinh phan tich Intent don gian neu chua qua NLU
-        cleaned_text = text.lower()
-        intent = "PLAY_YOUTUBE"
-        entities = {"media_name": text}
-
-        if "spotify" in cleaned_text:
-            intent = "PLAY_SPOTIFY"
-        elif "open" in cleaned_text:
-            intent = "OPEN_APP"
-            entities = {"app_name": text.replace("open", "").strip()}
-
-        return self.process_and_execute(
-            intent=intent, entities=entities, confidence=1.0
-        )
+        # LLMBrain (tuy chon) - "bo nao AI" xu ly cau hoi tu do ma NLU
+        # rule-based khong nhan dien duoc. Neu None hoac khong available,
+        # Agent tu dong quay ve hanh vi cu (khong pha vo ung dung).
+        self.llm = llm
 
     def process_and_execute(
         self,
@@ -44,6 +37,22 @@ class DecisionEngine:
             if log_callback:
                 log_callback(f"Agent: {msg}")
             self.tts.speak(msg)
+
+        # --- Day chinh la diem khac biet giua "voice command bot" va
+        # "AI voice agent": khi khong nhan dien duoc intent ro rang (UNKNOWN
+        # hoac do tin cay thap), Agent khong tra loi cau co dinh nua, ma nho
+        # LLM (Claude) "suy nghi" va tra loi tu nhien theo dung nghia mot AI.
+        if intent == "UNKNOWN" or confidence < self.CONFIDENCE_THRESHOLD:
+            raw_text = entities.get("raw_text", "")
+            llm_answer = self.llm.ask(raw_text) if self.llm else None
+            if llm_answer:
+                respond(llm_answer)
+            else:
+                respond(
+                    "I heard you, but I'm not sure how to process that "
+                    "request yet, sir. Could you please rephrase?"
+                )
+            return True
 
         if intent == "PLAY_YOUTUBE":
             media = entities.get("media_name")
@@ -91,7 +100,10 @@ class DecisionEngine:
 
         elif intent == "SEARCH_WEB":
             query = entities.get("query")
-            res_msg = self.executor.search_web(query)
+            # Truyen llm xuong Executor: neu Wikipedia khong co ket qua,
+            # Agent se thu hoi Claude truoc khi phai mo Google lam phuong an
+            # cuoi cung.
+            res_msg = self.executor.search_web(query, llm=self.llm)
             respond(res_msg)
 
         elif intent == "TAKE_NOTE":

@@ -9,6 +9,7 @@ import tkinter as tk
 from agent.decision_engine import DecisionEngine
 from core.asr import ASRHandler
 from core.context import ContextMemory
+from core.llm import LLMBrain
 from nlu.intent_parser import NaturalLanguageUnderstanding
 from core.tts import TextToSpeech
 from executor.actions import ActionExecutor
@@ -31,8 +32,17 @@ def main():
     # NLU Handler dung de trich xuat Intent & Entities tu cau noi nguoi dung
     nlu = NaturalLanguageUnderstanding()
 
+    # "Bo nao AI" (Claude qua Anthropic API) - xu ly cau hoi tu do ma NLU
+    # rule-based khong nhan dien duoc. Neu chua co ANTHROPIC_API_KEY, no se
+    # tu tat va Agent van chay binh thuong voi cac intent co san.
+    llm = LLMBrain()
+    if llm.available:
+        print("[LLM]: AI Brain (Claude) is ONLINE and will assist with free-form questions.")
+    else:
+        print("[LLM]: AI Brain is OFFLINE (set ANTHROPIC_API_KEY to enable it).")
+
     # 2. Khoi tao DecisionEngine
-    engine = DecisionEngine(context=context, executor=executor, tts=tts)
+    engine = DecisionEngine(context=context, executor=executor, tts=tts, llm=llm)
 
     # 3. Khoi tao Giao dien GUI qua cau 3D
     gui = JarvisGUI(root, on_submit_callback=None)

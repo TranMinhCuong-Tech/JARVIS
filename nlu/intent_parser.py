@@ -33,10 +33,6 @@ class NaturalLanguageUnderstanding:
                 r"\b(mute|unmute)\b",
                 r"\b(take\s+screenshot|capture\s+screen)\b"
             ],
-            "SEARCH_WEB": [
-                r"\b(search\s+for|google|find\s+info\s+about|lookup)\s+(.+)",
-                r"\b(what\s+is|who\s+is|tell\s+me\s+about)\s+(.+)"
-            ],
             "TAKE_NOTE": [
                 r"\b(note\s+down|take\s+a\s+note|write\s+down|remember\s+that)\s+(.+)"
             ],
@@ -46,8 +42,21 @@ class NaturalLanguageUnderstanding:
             "DATE": [
                 r"\b(what\s+day\s+is\s+today|what\s+date\s+is\s+it|today\'s\s+date|what\s+is\s+today)\b"
             ],
+            # IP_ADDRESS phai duoc dat truoc SEARCH_WEB, vi ca hai deu co the
+            # khop voi cau bat dau bang "what is ..." (vd: "what is my address").
+            # Neu de sau, SEARCH_WEB se "cuop" intent va mo trinh duyet tim kiem
+            # thay vi tra loi IP truc tiep.
             "IP_ADDRESS": [
-                r"\b(what\s+is\s+my\s+ip|my\s+ip\s+address|show\s+my\s+ip|what\'s\s+my\s+ip)\b"
+                r"\b(what\s+is|what\'s)\s+my\s+(ip\s+)?address\b",
+                r"\b(what\s+is|what\'s)\s+my\s+ip\b",
+                r"\bmy\s+ip\s+address\b",
+                r"\bshow\s+my\s+(ip|ip\s+address|address)\b",
+                r"\btell\s+me\s+my\s+(ip|address)\b",
+                r"\bip\s+address\b"
+            ],
+            "SEARCH_WEB": [
+                r"\b(search\s+for|google|find\s+info\s+about|lookup)\s+(.+)",
+                r"\b(what\s+is|who\s+is|tell\s+me\s+about)\s+(.+)"
             ],
             "LOCK": [
                 r"\b(lock\s+computer|lock\s+screen|lock\s+my\s+pc|lock\s+the\s+screen)\b"

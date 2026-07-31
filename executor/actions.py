@@ -1,11 +1,11 @@
 import os
 import re
+import socket
 import subprocess
 import time
 import urllib.parse
 import webbrowser
 import pyautogui
-import requests
 import wikipedia
 from datetime import datetime
 
@@ -168,13 +168,21 @@ class ActionExecutor:
             return "Screenshot saved to Pictures folder, sir."
         return "Command executed, sir."
 
-    def search_web(self, query: str) -> str:
+    def search_web(self, query: str, llm=None) -> str:
         if not query:
             return "No search query provided, sir."
         try:
             summary = wikipedia.summary(query, sentences=2)
             return f"According to Wikipedia, sir: {summary}"
         except Exception:
+            # Wikipedia khong co ket qua ro rang (VD: cau hoi mo hon, tu ngu
+            # mo ho...) -> thu hoi AI Brain (Claude) truoc khi phai mo trinh
+            # duyet, de Agent tra loi truc tiep bang giong noi thay vi day
+            # nguoi dung ra ngoai ung dung.
+            if llm:
+                answer = llm.ask(query)
+                if answer:
+                    return answer
             webbrowser.open(
                 f"https://www.google.com/search?q={urllib.parse.quote(query)}"
             )
@@ -204,12 +212,39 @@ class ActionExecutor:
         return f"Today is {date_str}, sir."
 
     def get_ip_address(self) -> str:
-        """Lay dia chi IP public."""
+        """Lay dia chi IP cua may bang thu vien 'socket' co san trong Python.
+
+        Khong goi bat ky request nao ra Internet / trinh duyet, chi dung
+        socket UDP "gia" (khong gui du lieu that) de he dieu hanh cho biet
+        card mang nao va IP nao se duoc dung de ra ngoai, tu do lay duoc
+        dia chi IP cuc bo (LAN) cua may mot cach nhanh va an toan.
+        """
+        ip = None
+
+        # Cach 1: dung socket UDP "trick" de xac dinh IP cuc bo chinh xac nhat
         try:
-            ip = requests.get("https://api.ipify.org", timeout=5).text
-            return f"Your public IP address is {ip}, sir."
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.settimeout(1.0)
+                # Khong thuc su gui goi tin nao, chi de OS chon interface phu hop
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+            finally:
+                s.close()
         except Exception:
-            return "Sorry sir, I could not retrieve your IP address at the moment."
+            ip = None
+
+        # Cach 2 (du phong): lay IP tu hostname cua may
+        if not ip:
+            try:
+                hostname = socket.gethostname()
+                ip = socket.gethostbyname(hostname)
+            except Exception:
+                ip = None
+
+        if ip:
+            return f"Your IP address is {ip}, sir."
+        return "Sorry sir, I could not retrieve your IP address at the moment."
 
     def lock_computer(self) -> str:
         """Khoa man hinh may tinh."""

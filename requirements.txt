@@ -1,8 +1,8 @@
 pyttsx3
 SpeechRecognition
 pyaudio
-requests
 pyautogui
 wikipedia
 yt-dlp
 psutil
+anthropic
