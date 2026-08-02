@@ -2,99 +2,166 @@
 
 ![JARVIS](assets/image.png)
 
-A modular AI Voice Agent built with Python and Tkinter, featuring a 3D particle sphere interface, speech recognition (ASR), natural language understanding (NLU), and text-to-speech (TTS).
+J.A.R.V.I.S is a Python-based voice assistant application that combines a Tkinter interface with a 3D particle sphere, speech recognition (ASR), natural language understanding (NLU), text-to-speech (TTS), and system automation such as opening applications, controlling volume, searching the web, sending messages, and monitoring the system.
 
-## Architecture
+This project is designed in a modular way, making it easy to extend and suitable for learning about AI agent architecture, natural language processing, action planning, and UI integration.
 
+## 1. Project Overview
+
+J.A.R.V.I.S is more than a simple voice command bot. It has two main processing layers:
+
+- The first layer is rule-based NLU, which is fast and reliable for clearly defined commands such as opening Notepad, increasing volume, taking screenshots, asking for the time, or closing an app.
+- The second layer is the AI Brain, powered by Anthropic Claude, which handles more open-ended user requests that do not match predefined intents. If no API key is configured, the system still runs normally and falls back to traditional behavior such as Wikipedia, Google search, or default responses.
+
+This is what makes the project feel like an agent rather than just a static voice-command switchboard.
+
+## 2. System Architecture
+
+```text
+ASR -> NLU -> Context Memory -> Decision Engine -> Action Executor -> TTS
+                     |
+                     v
+              AI Brain (Claude / Anthropic)
 ```
-ASR -> NLU (Intent + Entity) -> Context Memory -> Decision Engine -> Action Executor -> TTS
-                                                         |
-                                                         v
-                                      AI Brain (Claude, Anthropic API)
-                                 used when NLU confidence is low / intent is UNKNOWN,
-                                 and as a fallback inside SEARCH_WEB when Wikipedia has no match
-```
 
-The NLU is a fast, deterministic rule/regex layer for well-defined commands (open app, play music, system control...). For anything it can't confidently classify, the **Decision Engine** routes the raw utterance to the **AI Brain** (Claude via the Anthropic API) instead of returning a canned "I don't understand" — this is what makes the project an actual AI voice agent rather than a fixed voice-command switchboard. If no `ANTHROPIC_API_KEY` is configured, the AI Brain quietly stays offline and the agent falls back to its previous canned responses / Google search, so the app still runs without it.
+### What each component does
 
-## Features
+- ASR: captures speech and converts it into text.
+- NLU: analyzes the user input, identifies the intent, and extracts entities.
+- Context Memory: stores short-term context so the agent can better understand related follow-up requests.
+- Decision Engine: selects the appropriate action for each intent.
+- Action Executor: performs system operations such as opening browsers, controlling Windows, searching the web, and sending messages.
+- TTS: reads the response aloud using speech synthesis.
 
-| Feature | Description |
-|---------|-------------|
-| **Voice Recognition** | Continuous microphone listening with English & Vietnamese support |
-| **3D Sphere GUI** | Particle sphere with perspective rotation, glow effects, audio-reactive distortion, twinkling starfield background, idle "breathing" pulse, rotating radar-style HUD rings, and mode-based colors (listening / processing / speaking) |
-| **AI Brain (Claude)** | Free-form questions the rule-based NLU can't classify (or that Wikipedia has no article for) are answered by Claude via the Anthropic API, instead of a canned "I don't understand" |
-| **YouTube Playback** | Search and play videos directly in browser |
-| **Spotify Control** | Open Spotify, search songs, and auto-click play |
-| **App Management** | Open and close applications via Windows Start menu / taskkill |
-| **System Control** | Volume up/down/mute, take screenshots |
-| **Web Search** | Wikipedia summary or Google search fallback |
-| **Note Taking** | Save quick notes to `jarvis_notes.txt` on Desktop |
-| **Time & Date** | Ask "what time is it" or "what day is today" |
-| **IP Address** | Reports your machine's IP instantly using Python's built-in `socket` module — no browser or web request involved |
-| **Lock Screen** | Lock your Windows workstation |
-| **Shutdown** | Shutdown your computer after a 5-second countdown |
-| **Sleep Mode** | Put your computer to sleep |
-| **Exit** | Say "bye", "stop", or "exit" to close the agent |
+## 3. Available Features
 
-## Project Structure
+### 3.1 Core Features (No API key required)
 
-```
-AI_voice_agent_project/
+| Feature | Description | Example |
+|---|---|---|
+| Voice Recognition | Listens to the microphone and turns speech into commands | “Open Notepad” |
+| 3D GUI | A particle sphere with animated listening / processing / speaking states | No manual action needed |
+| Open / Close Applications | Opens or closes Windows applications | “Open Chrome”, “Close Notepad” |
+| System Control | Increases/decreases volume, mutes audio, captures screenshots | “Volume up”, “Take screenshot” |
+| Web Search | Uses Wikipedia first and falls back to Google if needed | “Tell me about Python” |
+| Note Taking | Saves notes to a file on the Desktop | “Take a note buy milk tomorrow” |
+| Time / Date | Answers with the current time or date | “What time is it” |
+| IP Address | Retrieves the machine IP using Python’s built-in socket module | “What is my IP” |
+| Lock Computer | Locks the Windows workstation | “Lock computer” |
+| Shutdown | Shuts down the computer after 5 seconds | “Shutdown computer” |
+| Sleep Mode | Puts the computer to sleep | “Sleep” |
+| Exit | Stops the agent using commands such as bye / stop / exit | “Bye” |
+
+### 3.2 Extended Features (No API key required)
+
+| Feature | Description | Example |
+|---|---|---|
+| Weather | Retrieves free weather data from Open-Meteo | “What’s the weather in Hanoi” |
+| System Monitoring | Checks CPU, RAM, Disk, and GPU usage | “Check CPU”, “System stats” |
+| Reminder | Sets reminders with desktop notifications | “Remind me in 10 minutes to call John” |
+| Brightness Control | Increases or decreases screen brightness | “Brightness up” |
+| Wi-Fi Toggle | Turns Wi-Fi on/off on Windows using netsh | “Turn off wifi” |
+| Desktop Control | Minimizes windows, switches windows, or shows the desktop | “Show desktop” |
+| Auto-start on Boot | Registers the app to launch automatically at startup | “Start with Windows” |
+| Game Update | Opens Steam/Epic to trigger update checks | “Update my games on steam” |
+| WhatsApp Messaging | Opens WhatsApp Web and pre-fills a message | “Send whatsapp message to mom saying I’ll be late” |
+| Telegram Messaging | Opens Telegram Web with a pre-filled message | “Send telegram message saying on my way” |
+
+### 3.3 Features Requiring ANTHROPIC_API_KEY
+
+| Feature | Description | Example |
+|---|---|---|
+| Clipboard Intelligence | Translates, summarizes, explains, or fixes the current clipboard content | “Translate my clipboard” |
+| Code Helper | Asks Claude to write, review, or explain code | “Help me code a bubble sort in Python” |
+
+> These two features reuse the same ANTHROPIC_API_KEY used by the AI Brain, so no separate key is required.
+
+## 4. Project Structure
+
+```text
+JarvisFull/
 ├── agent/
-│   ├── __init__.py
-│   └── decision_engine.py      # Intent routing & action planning
+│   └── decision_engine.py
+├── assets/
 ├── core/
-│   ├── __init__.py
-│   ├── asr.py                  # Speech Recognition (SpeechRecognition)
-│   ├── context.py              # Conversation context memory
-│   ├── llm.py                  # AI Brain - Claude (Anthropic API) fallback for free-form questions
-│   └── tts.py                  # Text-to-Speech (pyttsx3)
+│   ├── asr.py
+│   ├── context.py
+│   ├── llm.py
+│   └── tts.py
 ├── executor/
-│   ├── __init__.py
-│   └── actions.py              # System actions (browser, apps, volume, etc.)
+│   ├── actions.py
+│   ├── auto_start.py
+│   ├── clipboard_intel.py
+│   ├── code_helper.py
+│   ├── contacts.json
+│   ├── desktop_control.py
+│   ├── game_updater.py
+│   ├── reminder.py
+│   ├── send_message.py
+│   ├── system_monitor.py
+│   └── weather.py
 ├── nlu/
-│   ├── __init__.py
-│   └── intent_parser.py        # Regex-based intent & entity extraction
-├── gui.py                      # Tkinter 3D particle sphere interface
-├── main.py                     # Application entry point
-├── requirements.txt            # Python dependencies
-└── REAME.md                    # This file
+│   └── intent_parser.py
+├── gui.py
+├── main.py
+├── README.md
+└── requirements.txt
 ```
 
-## Prerequisites
+## 5. File Roles
 
-- **OS**: Windows 10 / 11
-- **Python**: 3.12 (recommended)
-- **Microphone**: Required for voice input (text input works as fallback)
+- main.py: application entry point; initializes modules and starts the command loop.
+- gui.py: main Tkinter interface with the 3D sphere, status area, and text input box.
+- agent/decision_engine.py: main planner that decides which action should be triggered for each intent.
+- nlu/intent_parser.py: classifies intents and extracts entities from user input using regex patterns.
+- core/asr.py: handles speech recognition.
+- core/context.py: stores short-term conversational context.
+- core/llm.py: wrapper for Claude via Anthropic API for free-form questions.
+- core/tts.py: converts text responses into speech.
+- executor/actions.py: core actions such as opening YouTube, Spotify, apps, notes, and network-related behavior.
+- executor/weather.py: fetches weather information from Open-Meteo.
+- executor/system_monitor.py: reads CPU, RAM, Disk, and GPU information.
+- executor/reminder.py: handles reminder notifications.
+- executor/desktop_control.py: manages brightness, Wi-Fi, and basic desktop actions.
+- executor/auto_start.py: enables startup automation.
+- executor/send_message.py: opens WhatsApp or Telegram for message sending.
 
-## Installation
+## 6. System Requirements
 
-### Step 1: Install Python 3.12 via Winget
+### 6.1 Operating System
+- Windows 10/11 is the primary target platform.
+- Some features can also work on macOS/Linux, but Windows is best for app automation, Wi-Fi control, and app launching behavior.
 
+### 6.2 Python
+- Python 3.12 is recommended.
+- Python 3.10 or 3.11 may also work, but 3.12 is the best choice.
+
+### 6.3 Input Devices
+- A microphone is required for voice interaction.
+- If the microphone is unavailable, you can still type commands manually into the text input field.
+
+## 7. Windows Installation Guide
+
+### Step 1: Install Python
 Open PowerShell as Administrator and run:
 
 ```powershell
 winget install Python.Python.3.12
 ```
 
-After installation, verify Python is added to PATH:
+Verify the installation:
 
 ```powershell
 python --version
-# Should print: Python 3.12.x
 ```
 
-If `python` is not recognized, add it manually:
-- Default install path: `C:\Users\<YourUser>\AppData\Local\Programs\Python\Python312`
-- Add both `Python312` and `Python312\Scripts` to your System Environment Variables -> PATH.
+If Python is not recognized, add it to PATH manually.
 
-### Step 2: Clone or Extract the Project
-
-Extract the ZIP file to a folder, e.g.:
+### Step 2: Download or Extract the Project
+Example:
 
 ```powershell
-cd D:\AI_voice_agent_project
+cd D:\JarvisFull
 ```
 
 ### Step 3: Create a Virtual Environment
@@ -110,30 +177,29 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 .venv\Scripts\Activate.ps1
 ```
 
-Your prompt should now show `(.venv)` at the beginning.
-
 ### Step 5: Install Dependencies
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-> **Note**: `pyaudio` may require a pre-built wheel on Windows. If `pip install pyaudio` fails, download the appropriate wheel from [https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio](https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio) and install it:
-> ```powershell
-> pip install PyAudio-0.2.14-cp312-cp312-win_amd64.whl
-> ```
+### Step 6: If pyaudio fails to install
+On Windows, pyaudio may require a separate wheel. If installation fails, download the correct wheel from the Gohlke repository and install it manually:
 
-### Step 6 (Optional): Enable the AI Brain (Claude)
+```powershell
+pip install PyAudio-0.2.14-cp312-cp312-win_amd64.whl
+```
 
-To let the agent answer free-form questions it doesn't recognize as a fixed command (instead of a canned "I don't understand" reply), set your Anthropic API key as an environment variable before launching:
+### Step 7 (Optional): Enable the AI Brain
+To allow the agent to answer free-form questions with Claude, set the environment variable:
 
 ```powershell
 $env:ANTHROPIC_API_KEY = "your-api-key-here"
 ```
 
-This is optional — without it, the agent runs exactly as before (canned replies / Wikipedia / Google search fallback).
+If this is not configured, the app will still run, but the AI Brain will remain offline and use standard fallbacks.
 
-## Running the Application
+## 8. Running the Application
 
 With the virtual environment activated:
 
@@ -141,101 +207,74 @@ With the virtual environment activated:
 python main.py
 ```
 
-The GUI will open with a 3D particle sphere. The agent will greet you based on the time of day:
+When it starts, the 3D interface will open and the agent will greet you based on the time of day.
 
-- **Morning** (00:00 - 11:59): *"Good morning, sir. Please tell me how can I help you, sir?"*
-- **Afternoon** (12:00 - 17:59): *"Good afternoon, sir..."*
-- **Evening** (18:00 - 23:59): *"Good evening, sir..."*
+## 9. Useful Example Commands
 
-## Test Cases
+### Opening Applications
+- “Open Notepad”
+- “Open Chrome”
+- “Launch Spotify”
 
-### 1. Play Music on YouTube
-**Say:** *"Play Starboy on YouTube"*
+### Playing Music
+- “Play Starboy on YouTube”
+- “Play Blinding Lights on Spotify”
 
-**Expected:** Browser opens YouTube with the song playing.
+### System Control
+- “Volume up”
+- “Mute”
+- “Take screenshot”
 
-### 2. Play Music on Spotify
-**Say:** *"Play Blinding Lights on Spotify"*
+### Search and Information
+- “What time is it”
+- “What day is today”
+- “What is my IP”
+- “Tell me about Python”
 
-**Expected:** Spotify opens, searches for the song, and clicks play.
+### New Features
+- “What’s the weather in Hanoi”
+- “Remind me in 10 minutes to call John”
+- “Brightness up”
+- “Turn off wifi”
+- “Show desktop”
+- “Send whatsapp message to mom saying I’ll be late”
 
-### 3. Open an Application
-**Say:** *"Open Notepad"*
+## 10. Important Notes
 
-**Expected:** Windows Start menu opens, types "Notepad", and launches it.
+- The project is primarily optimized for English voice commands.
+- Some features such as app launching, Windows control, Wi-Fi toggle, and messaging work best on Windows.
+- WhatsApp requires the user to be logged into WhatsApp Web in the default browser before messaging can work.
+- If you use the AI Brain, make sure the terminal session where you run the app also has the ANTHROPIC_API_KEY variable assigned.
+- Some automation features may require Administrator privileges or appropriate system access.
 
-### 4. Close an Application
-**Say:** *"Close Notepad"*
-
-**Expected:** Notepad process is terminated.
-
-### 5. Volume Control
-**Say:** *"Volume up"*
-
-**Expected:** System volume increases by 5 steps. Agent responds: *"Volume increased, sir."*
-
-### 6. Take a Screenshot
-**Say:** *"Take screenshot"*
-
-**Expected:** Screenshot saved to `C:\Users\<You>\Pictures\screenshot_<timestamp>.png`.
-
-### 7. Ask for Time
-**Say:** *"What time is it"*
-
-**Expected:** Agent responds with the current time, e.g. *"The current time is 02:15 PM, sir."*
-
-### 8. Ask for Date
-**Say:** *"What day is today"*
-
-**Expected:** Agent responds with the current date, e.g. *"Today is Thursday, July 31, 2026, sir."*
-
-### 9. Ask for IP Address
-**Say:** *"What is my IP"* or *"What is my address"*
-
-**Expected:** Agent instantly reports your machine's IP address using Python's built-in `socket` module — no browser or web page is opened.
-
-### 10. Lock Computer
-**Say:** *"Lock computer"*
-
-**Expected:** Windows workstation locks immediately.
-
-### 11. Shutdown Computer
-**Say:** *"Shutdown computer"*
-
-**Expected:** Agent confirms, then system shuts down after 5 seconds.
-
-### 12. Put Computer to Sleep
-**Say:** *"Sleep"*
-
-**Expected:** Computer enters sleep mode.
-
-### 13. Take a Note
-**Say:** *"Take a note buy milk tomorrow"*
-
-**Expected:** Note appended to `jarvis_notes.txt` on Desktop.
-
-### 14. Ask a Free-Form Question (AI Brain)
-**Say:** *"Why is the sky blue"* (or any question the NLU can't classify)
-
-**Expected:** If `ANTHROPIC_API_KEY` is set, Claude answers naturally by voice. If not set, the agent responds with its default "not sure how to process that" message.
-
-### 15. Exit the Agent
-**Say:** *"Bye"* or *"Stop"*
-
-**Expected:** Agent says goodbye and the application closes after 2 seconds.
-
-## Troubleshooting
+## 11. Troubleshooting
 
 | Issue | Solution |
-|-------|----------|
-| `No module named 'speech_recognition'` | Run `pip install SpeechRecognition` inside the venv |
-| `pyaudio` install fails | Download pre-built wheel from [Christoph Gohlke's site](https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio) |
-| Microphone not detected | Check Windows Privacy Settings -> Microphone access is allowed for apps |
-| Commands repeat in a loop | This is fixed by anti-echo filtering. Ensure you are using the latest version of `main.py` |
-| TTS not speaking | Ensure you have a default Windows voice installed (Settings -> Time & Language -> Speech) |
-| "What is my address" opens a web page instead of speaking the IP | Fixed — `IP_ADDRESS` intent now matches before `SEARCH_WEB` in `nlu/intent_parser.py`, and IP lookup uses only the built-in `socket` module (`executor/actions.py`), so it never opens a browser |
-| AI Brain never answers free-form questions | Make sure `pip install anthropic` succeeded and `ANTHROPIC_API_KEY` is set in the same terminal session before running `python main.py`. Check the console log on startup: it prints whether the AI Brain is ONLINE or OFFLINE |
+|---|---|
+| Module not found | Run `pip install -r requirements.txt` inside the virtual environment |
+| pyaudio installation fails | Download the correct Windows wheel or use a compatible Python version |
+| Microphone not detected | Check microphone access permissions in Windows Settings |
+| TTS does not speak | Make sure a default speech voice is installed on Windows |
+| AI Brain does not respond | Check ANTHROPIC_API_KEY and confirm that the terminal session is the same one used to launch the app |
+| Commands repeat | The system includes anti-echo / duplicate filtering, but using the latest version is recommended |
 
-## License
+## 12. Current Limitations
 
-Personal use only. Built for educational and productivity purposes.
+This project is currently more of an educational and experimental AI assistant than a full commercial voice assistant. Some limitations include:
+
+- NLU is still based on regex patterns, so it works best for clear commands rather than complex conversational dialogue.
+- Some automation features that interact with UI elements may require a desktop environment and compatible mouse/keyboard behavior.
+- The AI Brain is currently turn-based rather than a continuous live stream like Gemini Live.
+
+## 13. License
+
+This project is intended for learning, experimentation, and personal use. Feel free to modify and extend it further.
+
+## 14. Notes for Developers
+
+If you want to improve the project, the next priorities could be:
+
+- expanding the NLU with more command patterns and better Vietnamese support,
+- adding longer-term memory and conversation history,
+- improving error handling and logging,
+- integrating more advanced AI vision or web browsing capabilities.

@@ -6,3 +6,9 @@ wikipedia
 yt-dlp
 psutil
 anthropic
+requests
+plyer
+pyperclip
+screen-brightness-control
+GPUtil
+pywhatkit

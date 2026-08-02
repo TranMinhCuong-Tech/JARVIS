@@ -1,6 +1,15 @@
 from core.context import ContextMemory
 from core.tts import TextToSpeech
 from executor.actions import ActionExecutor
+from executor import weather as weather_mod
+from executor import system_monitor
+from executor import reminder as reminder_mod
+from executor import desktop_control
+from executor import auto_start
+from executor import game_updater
+from executor import clipboard_intel
+from executor import code_helper as code_helper_mod
+from executor import send_message
 
 
 class DecisionEngine:
@@ -129,6 +138,63 @@ class DecisionEngine:
 
         elif intent == "SLEEP":
             respond(self.executor.sleep_computer())
+
+        elif intent == "WEATHER":
+            city = entities.get("city") or self.context.resolve_target(None)
+            if not city:
+                respond("Which city's weather would you like, sir?")
+                return True
+            respond(weather_mod.get_weather(city))
+
+        elif intent == "SYSTEM_STATS":
+            respond(system_monitor.get_system_stats())
+
+        elif intent == "SET_REMINDER":
+            when = entities.get("when", "")
+            message = entities.get("message", "")
+            respond(reminder_mod.set_reminder(when, message))
+
+        elif intent == "BRIGHTNESS":
+            direction = entities.get("direction", "up")
+            respond(desktop_control.set_brightness(direction))
+
+        elif intent == "WIFI_TOGGLE":
+            state = entities.get("state", "on")
+            respond(desktop_control.toggle_wifi(state))
+
+        elif intent == "DESKTOP_CONTROL":
+            action = entities.get("action", "")
+            if "switch" in action or "alt tab" in action:
+                respond(desktop_control.switch_window())
+            else:
+                respond(desktop_control.show_desktop())
+
+        elif intent == "AUTO_START":
+            if entities.get("enable", True):
+                respond(auto_start.enable_auto_start())
+            else:
+                respond(auto_start.disable_auto_start())
+
+        elif intent == "GAME_UPDATE":
+            platform_name = entities.get("platform", "steam")
+            respond(game_updater.update_games(platform_name))
+
+        elif intent == "CLIPBOARD_TOOL":
+            action = entities.get("action", "")
+            respond(clipboard_intel.process_clipboard(action, self.llm))
+
+        elif intent == "CODE_HELPER":
+            request = entities.get("request", "")
+            respond(code_helper_mod.code_helper(request, self.llm))
+
+        elif intent == "SEND_MESSAGE":
+            platform_name = entities.get("platform", "whatsapp")
+            message = entities.get("message", "")
+            if platform_name == "telegram":
+                respond(send_message.send_telegram(message))
+            else:
+                contact = entities.get("contact", "")
+                respond(send_message.send_whatsapp(contact, message))
 
         elif intent == "EXIT":
             respond("Goodbye sir. Have a productive day.")

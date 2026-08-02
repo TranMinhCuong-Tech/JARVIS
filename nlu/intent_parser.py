@@ -70,7 +70,52 @@ class NaturalLanguageUnderstanding:
             "EXIT": [
                 r"\b(exit|quit|bye|goodbye|stop\s+agent|close\s+agent)\b",
                 r"\b(stop)\b"
-            ]
+            ],
+
+            # --- Cac intent moi (khong can API key, tru CLIPBOARD_TOOL / CODE_HELPER) ---
+            "WEATHER": [
+                r"\b(weather|forecast)\s+(?:in|at|for)\s+(.+)",
+                r"\b(what\'s|what\s+is)\s+the\s+weather\s+(?:in|at|for)\s+(.+)",
+                r"\b(weather)\b"
+            ],
+            "SYSTEM_STATS": [
+                r"\b(system\s+stats|how\'s\s+my\s+(pc|computer)\s+doing|check\s+(cpu|ram|memory)|hardware\s+status)\b"
+            ],
+            "SET_REMINDER": [
+                r"\bremind\s+me\s+(in\s+\d+\s*(?:second|minute|hour)s?)\s+to\s+(.+)",
+                r"\bset\s+a\s+reminder\s+(in\s+\d+\s*(?:second|minute|hour)s?)\s+to\s+(.+)"
+            ],
+            "BRIGHTNESS": [
+                r"\b(brightness\s+up|increase\s+brightness|brighter)\b",
+                r"\b(brightness\s+down|decrease\s+brightness|dimmer)\b"
+            ],
+            "WIFI_TOGGLE": [
+                r"\b(turn\s+on\s+wifi|enable\s+wifi|wifi\s+on)\b",
+                r"\b(turn\s+off\s+wifi|disable\s+wifi|wifi\s+off)\b"
+            ],
+            "DESKTOP_CONTROL": [
+                r"\b(minimize\s+all|show\s+desktop)\b",
+                r"\b(switch\s+window|alt\s+tab)\b"
+            ],
+            "AUTO_START": [
+                r"\b(enable\s+auto\s*.?start|start\s+with\s+windows|start\s+on\s+boot)\b",
+                r"\b(disable\s+auto\s*.?start|don\'t\s+start\s+with\s+windows)\b"
+            ],
+            "GAME_UPDATE": [
+                r"\b(update\s+(?:my\s+)?games\s+on\s+(steam|epic))\b",
+                r"\b(check\s+(?:for\s+)?(steam|epic)\s+updates)\b"
+            ],
+            "CLIPBOARD_TOOL": [
+                r"\b(translate|summarize|explain|fix)\s+(?:my|the)?\s*clipboard\b"
+            ],
+            "CODE_HELPER": [
+                r"\b(help\s+me\s+code|code\s+helper|review\s+my\s+code|write\s+(?:me\s+)?(?:a\s+)?(?:function|script|code))\s*(.*)"
+            ],
+            "SEND_MESSAGE": [
+                r"\b(?:send|message)\s+(.+?)\s+on\s+whatsapp\s+(?:saying|that says)\s+(.+)",
+                r"\bsend\s+(?:a\s+)?whatsapp\s+(?:message\s+)?to\s+(.+?)\s+(?:saying|that says)\s+(.+)",
+                r"\bsend\s+(?:a\s+)?telegram\s+message\s+(?:saying|that says)\s+(.+)",
+            ],
         }
 
     def parse(self, text: str) -> Tuple[str, Dict[str, Any], float]:
@@ -103,6 +148,35 @@ class NaturalLanguageUnderstanding:
                         entities["query"] = groups[-1].strip() if groups else ""
                     elif intent == "TAKE_NOTE":
                         entities["content"] = groups[-1].strip() if groups else ""
+                    elif intent == "WEATHER":
+                        entities["city"] = groups[-1].strip() if len(groups) >= 2 and groups[-1] else ""
+                    elif intent == "SET_REMINDER":
+                        entities["when"] = groups[0].strip() if len(groups) >= 1 else ""
+                        entities["message"] = groups[1].strip() if len(groups) >= 2 else ""
+                    elif intent == "BRIGHTNESS":
+                        entities["direction"] = "up" if "up" in text or "increase" in text or "brighter" in text else "down"
+                    elif intent == "WIFI_TOGGLE":
+                        entities["state"] = "on" if ("on" in text or "enable" in text) and "off" not in text and "disable" not in text else "off"
+                    elif intent == "DESKTOP_CONTROL":
+                        entities["action"] = text
+                    elif intent == "AUTO_START":
+                        entities["enable"] = "disable" not in text and "don't" not in text
+                    elif intent == "GAME_UPDATE":
+                        platform_match = re.search(r"(steam|epic)", text)
+                        entities["platform"] = platform_match.group(1) if platform_match else "steam"
+                    elif intent == "CLIPBOARD_TOOL":
+                        action_match = re.search(r"(translate|summarize|explain|fix)", text)
+                        entities["action"] = action_match.group(1) if action_match else ""
+                    elif intent == "CODE_HELPER":
+                        entities["request"] = text
+                    elif intent == "SEND_MESSAGE":
+                        if "telegram" in text:
+                            entities["platform"] = "telegram"
+                            entities["message"] = groups[-1].strip() if groups else ""
+                        else:
+                            entities["platform"] = "whatsapp"
+                            entities["contact"] = groups[0].strip() if len(groups) >= 1 else ""
+                            entities["message"] = groups[1].strip() if len(groups) >= 2 else ""
 
                     return intent, entities, 0.95
 
